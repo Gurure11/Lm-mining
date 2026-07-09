@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LM Commodities Income & Expenditure</title>
+  <style>
+    :root { --bg:#f5f7fb; --card:#fff; --text:#172033; --muted:#667085; --brand:#1f7a4d; --bad:#b42318; --warn:#b54708; --line:#d9dee8; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial, sans-serif; background:var(--bg); color:var(--text); }
+    .hidden { display:none !important; }
+    .login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+    .login-card, .card { background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:0 10px 30px rgba(20,30,50,.07); }
+    .login-card { width:420px; padding:28px; }
+    h1,h2,h3 { margin:0 0 14px; }
+    label { display:block; font-weight:700; margin:10px 0 6px; font-size:13px; }
+    input, select, textarea { width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px; font-size:14px; background:#fff; }
+    textarea { min-height:80px; resize:vertical; }
+    button { border:0; border-radius:10px; padding:11px 14px; background:var(--brand); color:white; font-weight:700; cursor:pointer; }
+    button.secondary { background:#344054; } button.danger { background:var(--bad); } button.light { background:#eef2f6; color:#172033; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; background:#0b2b1c; color:#fff; position:sticky; top:0; z-index:2; }
+    .tabs { display:flex; gap:8px; flex-wrap:wrap; padding:14px 20px; background:#fff; border-bottom:1px solid var(--line); }
+    .tabs button { background:#eef2f6; color:#172033; } .tabs button.active { background:var(--brand); color:#fff; }
+    .main { padding:20px; max-width:1400px; margin:0 auto; }
+    .grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; }
+    .grid2 { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; }
+    .card { padding:16px; margin-bottom:16px; }
+    .metric { font-size:24px; font-weight:800; margin-top:8px; } .muted { color:var(--muted); font-size:13px; }
+    .row { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
+    .row3 { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; }
+    table { width:100%; border-collapse:collapse; background:#fff; border-radius:12px; overflow:hidden; }
+    th,td { padding:10px; border-bottom:1px solid var(--line); text-align:left; font-size:13px; vertical-align:top; }
+    th { background:#f0f3f8; }
+    .pill { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700; background:#eef2f6; }
+    .ok { color:var(--brand); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+    .toast { position:fixed; right:18px; bottom:18px; background:#172033; color:#fff; padding:12px 16px; border-radius:12px; display:none; z-index:3; max-width:380px; }
+    @media(max-width:900px){ .grid,.grid2,.row,.row3 { grid-template-columns:1fr; } .topbar { align-items:flex-start; gap:10px; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <div id="loginView" class="login-wrap">
+    <div class="login-card">
+      <h1>LM Commodities</h1>
+      <p class="muted">Income, expenditure, approvals, samples and tanks dashboard.</p>
+      <label>Username</label><input id="loginUsername" autocomplete="username" />
+      <label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" />
+      <button style="width:100%;margin-top:16px" onclick="login()">Login</button>
+      <p class="muted">Users are fetched from the <b>Users</b> tab.</p>
+    </div>
+  </div>
+
+  <div id="appView" class="hidden">
+    <div class="topbar">
+      <div><b>LM Commodities Income & Expenditure</b><div class="muted" id="liveStatus" style="color:#c7f9dd">Connecting...</div></div>
+      <div><span id="userBadge"></span> <button class="light" onclick="logout()">Logout</button></div>
+    </div>
+    <div class="tabs">
+      <button class="active" onclick="showTab('dashboard',this)">Dashboard</button>
+      <button onclick="showTab('revenue',this)">Daily Revenue</button>
+      <button onclick="showTab('expense',this)">Expense Request</button>
+      <button onclick="showTab('approvals',this)">Approvals</button>
+      <button onclick="showTab('samples',this)">Rock/Sand Samples</button>
+      <button onclick="showTab('tanks',this)">Tanks Run</button>
+      <button onclick="showTab('records',this)">Records</button>
+    </div>
+
+    <main class="main">
+      <section id="dashboard" class="tabPanel">
+        <div class="grid" id="summaryCards"></div>
+      </section>
+
+      <section id="revenue" class="tabPanel hidden">
+        <div class="card">
+          <h2>Record Daily Revenue</h2>
+          <div class="row3"><div><label>Date</label><input id="revDate" type="date"></div><div><label>Amount</label><input id="revAmount" inputmode="decimal"></div><div><label>Category</label><input id="revCategory" value="Revenue"></div></div>
+          <label>Description</label><textarea id="revDescription"></textarea>
+          <button onclick="saveRevenue()">Save Revenue</button>
+        </div>
+      </section>
+
+      <section id="expense" class="tabPanel hidden">
+        <div class="card">
+          <h2>Request Funds for Expense</h2>
+          <div class="row3"><div><label>Date</label><input id="expDate" type="date"></div><div><label>Amount</label><input id="expAmount" inputmode="decimal"></div><div><label>Category</label><input id="expCategory" value="Expense"></div></div>
+          <label>Purpose for request of funds</label><textarea id="expPurpose"></textarea>
+          <label>Payment request info</label><textarea id="expPaymentInfo" placeholder="Supplier, bank details, invoice reference, notes"></textarea>
+          <button onclick="requestExpense()">Submit Expense Request</button>
+        </div>
+      </section>
+
+      <section id="approvals" class="tabPanel hidden">
+        <div class="card"><h2>Approval Basket</h2><div id="approvalTable"></div></div>
+      </section>
+
+      <section id="samples" class="tabPanel hidden">
+        <div class="card">
+          <h2>Rock / Sand Sample Results</h2>
+          <div class="row3"><div><label>Date</label><input id="sampleDate" type="date"></div><div><label>Sample Type</label><select id="sampleType"><option>Rock</option><option>Sand</option></select></div><div><label>Batch / Reference</label><input id="sampleBatch"></div></div>
+          <div class="grid2" id="sampleInputs"></div>
+          <label>Tonnage Leached (mainly for sands)</label><input id="tonnageLeached" inputmode="decimal" value="0">
+          <button onclick="saveSamples()">Save Sample Results</button>
+        </div>
+      </section>
+
+      <section id="tanks" class="tabPanel hidden">
+        <div class="card">
+          <h2>Number of Tanks Run Per Week</h2>
+          <div class="row3"><div><label>Week Date</label><input id="tankDate" type="date"></div><div><label>Tank 1</label><input id="tank1" inputmode="numeric" value="0"></div><div><label>Tank 2</label><input id="tank2" inputmode="numeric" value="0"></div></div>
+          <div class="row"><div><label>Tank 3</label><input id="tank3" inputmode="numeric" value="0"></div><div><label>Tank 4</label><input id="tank4" inputmode="numeric" value="0"></div></div>
+          <button onclick="saveTanks()">Save Tank Runs</button>
+        </div>
+      </section>
+
+      <section id="records" class="tabPanel hidden">
+        <div class="card"><h2>All Records</h2><div id="recordsTable"></div></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+<script>
+const SCRIPT_URL = 'PASTE_DEPLOYED_WEB_APP_URL_HERE';
+let STATE = { user:null, records:[], summary:{} };
+
+function today(){ return new Date().toISOString().slice(0,10); }
+['revDate','expDate','sampleDate','tankDate'].forEach(id => setTimeout(()=>{ const el=document.getElementById(id); if(el) el.value=today(); },0));
+for(let i=1;i<=10;i++){ const d=document.createElement('div'); d.innerHTML=`<label>Sample ${i}</label><input id="sample${i}" inputmode="decimal" placeholder="Grade result ${i}">`; document.addEventListener('DOMContentLoaded',()=>document.getElementById('sampleInputs').appendChild(d)); }
+
+async function api(action, data={}){
+  if(!SCRIPT_URL || SCRIPT_URL.includes('PASTE_DEPLOYED')) throw new Error('Paste your deployed Apps Script Web App URL into SCRIPT_URL in the HTML.');
+  const res = await fetch(SCRIPT_URL, { method:'POST', mode:'cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action, ...data}) });
+  const text = await res.text();
+  let json; try { json = JSON.parse(text); } catch(e){ throw new Error('Apps Script returned non-JSON. Deploy as Web App, Execute as Me, Anyone with link. Response: '+text.slice(0,160)); }
+  if(!json.ok) throw new Error(json.error || 'Request failed');
+  return json;
+}
+function money(n){ return 'R ' + Number(n||0).toLocaleString('en-ZA',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function num(id){ return Number(String(document.getElementById(id).value||'0').replace(',','.').replace(/[^0-9.\-]/g,'')) || 0; }
+function val(id){ return document.getElementById(id).value.trim(); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',3500); }
+
+async function login(){
+  try{
+    const r = await api('login',{username:val('loginUsername'), password:val('loginPassword')});
+    STATE.user = r.user; localStorage.setItem('lmUser', JSON.stringify(r.user));
+    document.getElementById('loginView').classList.add('hidden'); document.getElementById('appView').classList.remove('hidden');
+    document.getElementById('userBadge').textContent = `${r.user.name} (${r.user.role})`;
+    await refresh();
+  }catch(e){ toast(e.message); }
+}
+function logout(){ localStorage.removeItem('lmUser'); location.reload(); }
+async function refresh(){
+  const r = await api('bootstrap',{userId:STATE.user.userId, email:STATE.user.email});
+  STATE.records = r.records || []; STATE.summary = r.summary || {};
+  document.getElementById('liveStatus').textContent = 'Live connection active • Last sync ' + new Date().toLocaleTimeString();
+  renderDashboard(); renderApprovals(); renderRecords();
+}
+function renderDashboard(){
+  const s=STATE.summary, cards=[
+    ['Daily Revenue',money(s.dailyRevenue)],['Weekly Revenue',money(s.weeklyRevenue)],['Monthly Revenue',money(s.monthlyRevenue)],
+    ['Daily Expenditure',money(s.dailyExpenditure)],['Weekly Expenditure',money(s.weeklyExpenditure)],['Monthly Expenditure',money(s.monthlyExpenditure)],
+    ['Pending Executive1',s.pendingExecutive1||0],['Pending Executive2',s.pendingExecutive2||0],
+    ['Total Tanks So Far',s.totalTanks||0],['Total Rock Samples',s.totalRockSamples||0],['Total Sand Samples',s.totalSandSamples||0],
+    ['Average Rock Grade',Number(s.averageRockGrade||0).toFixed(3)],['Average Sand Grade',Number(s.averageSandGrade||0).toFixed(3)],
+    ['Total Sands Tonnage Leached',Number(s.totalSandsTonnageLeached||0).toFixed(3)],['Average Sample Grade',Number(s.averageSampleGrade||0).toFixed(3)],
+    ['Expected Bullion',Number(s.expectedBullion||0).toFixed(3)]
+  ];
+  document.getElementById('summaryCards').innerHTML = cards.map(c=>`<div class="card"><div class="muted">${c[0]}</div><div class="metric">${c[1]}</div></div>`).join('');
+}
+function renderApprovals(){
+  const role=(STATE.user.role||'').toLowerCase(); const basket = role==='executive1'?'Executive1':role==='executive2'?'Executive2':'';
+  const rows = STATE.records.filter(r=>r.recordType==='Expense' && r.currentBasket===basket);
+  if(!basket){ document.getElementById('approvalTable').innerHTML='<p class="muted">Only Executive1 and Executive2 can approve expense requests.</p>'; return; }
+  document.getElementById('approvalTable').innerHTML = table(rows, true);
+}
+function renderRecords(){ document.getElementById('recordsTable').innerHTML = table(STATE.records, false); }
+function table(rows, actions){
+  if(!rows.length) return '<p class="muted">No records found.</p>';
+  return `<table><thead><tr><th>Date</th><th>Type</th><th>Unique No.</th><th>Requester</th><th>Amount</th><th>Info</th><th>Status</th>${actions?'<th>Action</th>':''}</tr></thead><tbody>`+
+  rows.map(r=>`<tr><td>${r.date||''}</td><td>${r.recordType||''}</td><td>${r.uniqueNumber||r.recordId||''}</td><td>${r.requestedByName||''}</td><td>${r.amount?money(r.amount):''}</td><td>${escapeHtml(r.purpose||r.revenueDescription||r.sampleType||'')}</td><td><span class="pill">${r.status||''}</span></td>${actions?`<td><textarea id="c_${r.uniqueNumber}" placeholder="Comment"></textarea><button onclick="approve('${r.uniqueNumber}','approve')">Approve</button> <button class="danger" onclick="approve('${r.uniqueNumber}','reject')">Reject</button></td>`:''}</tr>`).join('')+
+  '</tbody></table>';
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+function showTab(id,btn){ document.querySelectorAll('.tabPanel').forEach(x=>x.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); }
+
+async function saveRevenue(){ try{ await api('saveRevenue',{userId:STATE.user.userId,email:STATE.user.email,date:val('revDate'),amount:num('revAmount'),category:val('revCategory'),description:val('revDescription')}); toast('Revenue saved.'); await refresh(); }catch(e){toast(e.message);} }
+async function requestExpense(){ try{ const r=await api('requestExpense',{userId:STATE.user.userId,email:STATE.user.email,date:val('expDate'),amount:num('expAmount'),category:val('expCategory'),purpose:val('expPurpose'),paymentInfo:val('expPaymentInfo')}); toast('Expense request submitted: '+r.uniqueNumber); await refresh(); }catch(e){toast(e.message);} }
+async function approve(unique, decision){ try{ await api('approveExpense',{userId:STATE.user.userId,email:STATE.user.email,uniqueNumber:unique,decision,comment:val('c_'+unique)}); toast('Expense request updated.'); await refresh(); }catch(e){toast(e.message);} }
+async function saveSamples(){ try{ const data={userId:STATE.user.userId,email:STATE.user.email,date:val('sampleDate'),sampleType:val('sampleType'),sampleBatch:val('sampleBatch'),tonnageLeached:num('tonnageLeached')}; for(let i=1;i<=10;i++) data['sample'+i]=num('sample'+i); await api('saveSamples',data); toast('Sample results saved.'); await refresh(); }catch(e){toast(e.message);} }
+async function saveTanks(){ try{ await api('saveTanks',{userId:STATE.user.userId,email:STATE.user.email,date:val('tankDate'),tank1:num('tank1'),tank2:num('tank2'),tank3:num('tank3'),tank4:num('tank4')}); toast('Tank runs saved.'); await refresh(); }catch(e){toast(e.message);} }
+
+(async function init(){
+  const u = localStorage.getItem('lmUser');
+  if(u){ STATE.user=JSON.parse(u); document.getElementById('loginView').classList.add('hidden'); document.getElementById('appView').classList.remove('hidden'); document.getElementById('userBadge').textContent = `${STATE.user.name} (${STATE.user.role})`; try{ await refresh(); }catch(e){ toast(e.message); }}
+})();
+</script>
+</body>
+</html>
