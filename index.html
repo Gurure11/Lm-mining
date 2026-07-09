@@ -8,6 +8,10 @@
     :root { --bg:#f5f7fb; --card:#fff; --text:#172033; --muted:#667085; --brand:#1f7a4d; --bad:#b42318; --warn:#b54708; --line:#d9dee8; }
     * { box-sizing:border-box; }
     body { margin:0; font-family:Arial, sans-serif; background:var(--bg); color:var(--text); }
+    .brand-lockup { display:flex; align-items:center; gap:12px; }
+    .brand-logo { width:72px; height:72px; object-fit:contain; border-radius:14px; background:#fff; box-shadow:0 8px 24px rgba(0,0,0,.12); }
+    .top-logo { width:48px; height:48px; object-fit:contain; border-radius:10px; background:#fff; margin-right:10px; vertical-align:middle; }
+    .wa-link { display:inline-block; margin-top:6px; padding:8px 10px; border-radius:9px; background:#25D366; color:#fff; text-decoration:none; font-weight:700; font-size:12px; }
     .hidden { display:none !important; }
     .login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
     .login-card, .card { background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:0 10px 30px rgba(20,30,50,.07); }
@@ -47,8 +51,7 @@
 <body>
   <div id="loginView" class="login-wrap">
     <div class="login-card">
-      <h1>LM Commodities</h1>
-      <p class="muted">Income, expenditure, approvals, samples and tanks dashboard.</p>
+      <div class="brand-lockup"><img src="lmcommodities.png" alt="LM Commodities Logo" class="brand-logo"><div><h1>LM Commodities</h1><p class="muted">Income, expenditure, approvals, samples and tanks dashboard.</p></div></div>
       <label>Username</label><input id="loginUsername" autocomplete="username" />
       <label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" />
       <button style="width:100%;margin-top:16px" onclick="login()">Login</button>
@@ -58,7 +61,7 @@
 
   <div id="appView" class="hidden">
     <div class="topbar">
-      <div><b>LM Commodities Income & Expenditure</b><div class="muted" id="liveStatus" style="color:#c7f9dd">Connecting...</div></div>
+      <div class="brand-lockup"><img src="lmcommodities.png" alt="LM Commodities Logo" class="top-logo"><div><b>LM Commodities Income & Expenditure</b><div class="muted" id="liveStatus" style="color:#c7f9dd">Connecting...</div></div></div>
       <div><span id="userBadge"></span> <button class="light" onclick="logout()">Logout</button></div>
     </div>
     <div class="tabs">
@@ -68,6 +71,7 @@
       <button onclick="showTab('approvals',this)">Approvals</button>
       <button onclick="showTab('samples',this)">Rock/Sand Samples</button>
       <button onclick="showTab('tanks',this)">Tanks Run</button>
+      <button onclick="showTab('production',this)">Ore Production</button>
       <button onclick="showTab('reports',this)">Reports</button>
       <button onclick="showTab('creditors',this)">Creditors</button>
       <button onclick="showTab('records',this)">Records</button>
@@ -121,6 +125,16 @@
         </div>
       </section>
 
+      <section id="production" class="tabPanel hidden">
+        <div class="card">
+          <h2>Daily Ore Production & Bullion Recovery</h2>
+          <div class="row3"><div><label>Date</label><input id="prodDate" type="date"></div><div><label>Daily Ore Production</label><input id="oreTonnesProduced" inputmode="decimal" placeholder="Tonnes produced"></div><div><label>Average Grade</label><input id="oreAverageGrade" inputmode="decimal" placeholder="g/t or grade"></div></div>
+          <div class="row3"><div><label>Tonnes Milled</label><input id="tonnesMilled" inputmode="decimal"></div><div><label>Bullion Recovered</label><input id="bullionRecovered" inputmode="decimal" placeholder="grams"></div><div><label>Price Per Gram</label><input id="pricePerGram" inputmode="decimal"></div></div>
+          <div class="card" style="background:#f8fafc"><div class="muted">Calculated Total Value</div><div class="metric" id="bullionValuePreview">R 0.00</div></div>
+          <button onclick="saveProduction()">Save Production</button>
+        </div>
+      </section>
+
 
       <section id="reports" class="tabPanel hidden">
         <div class="card">
@@ -157,11 +171,11 @@
 
   <div id="toast" class="toast"></div>
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwrqOem152eq_hhcrArv5QxU3D0GG5q5g5lHZ60lhOJrx4A_r4fOBGHCVhS8eAbEi_5/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx_5TLnjiHu70lMHlYXNPEyFLi3LND9GhcHbinATYDC-uvoPiSP6-HjDOomf5hqeNRP/exec';
 let STATE = { user:null, records:[], summary:{} };
 
 function today(){ return new Date().toISOString().slice(0,10); }
-['revDate','expDate','sampleDate','tankDate','reportFrom','reportTo','creditorDate','creditorDueDate'].forEach(id => setTimeout(()=>{ const el=document.getElementById(id); if(el) el.value=today(); },0));
+['revDate','expDate','sampleDate','tankDate','prodDate','reportFrom','reportTo','creditorDate','creditorDueDate'].forEach(id => setTimeout(()=>{ const el=document.getElementById(id); if(el) el.value=today(); },0));
 for(let i=1;i<=10;i++){ const d=document.createElement('div'); d.innerHTML=`<label>Sample ${i}</label><input id="sample${i}" inputmode="decimal" placeholder="Grade result ${i}">`; document.addEventListener('DOMContentLoaded',()=>document.getElementById('sampleInputs').appendChild(d)); }
 
 async function api(action, data={}){
@@ -206,6 +220,9 @@ function renderDashboard(){
     ['Average Rock Grade',Number(s.averageRockGrade||0).toFixed(3)],['Average Sand Grade',Number(s.averageSandGrade||0).toFixed(3)],
     ['Total Sands Tonnage Leached',Number(s.totalSandsTonnageLeached||0).toFixed(3)],['Average Sample Grade',Number(s.averageSampleGrade||0).toFixed(3)],
     ['Expected Bullion',Number(s.expectedBullion||0).toFixed(3)],
+    ['Daily Ore Production',Number(s.dailyOreProduction||0).toFixed(3)],['Weekly Ore Production',Number(s.weeklyOreProduction||0).toFixed(3)],['Monthly Ore Production',Number(s.monthlyOreProduction||0).toFixed(3)],
+    ['Total Ore Production',Number(s.totalOreProduction||0).toFixed(3)],['Total Tonnes Milled',Number(s.totalTonnesMilled||0).toFixed(3)],['Average Ore Grade',Number(s.averageOreGrade||0).toFixed(3)],
+    ['Bullion Recovered',Number(s.totalBullionRecovered||0).toFixed(3)],['Bullion Total Value',money(s.bullionTotalValue||0)],
     ['Creditors Due 30 Days',money(s.creditorsDue30Amount||0)],['Creditors Due 60 Days',money(s.creditorsDue60Amount||0)]
   ];
   document.getElementById('summaryCards').innerHTML = cards.map(c=>`<div class="card"><div class="muted">${c[0]}</div><div class="metric">${c[1]}</div></div>`).join('');
@@ -235,15 +252,15 @@ function renderRecords(){ document.getElementById('recordsTable').innerHTML = ta
 function table(rows, actions){
   if(!rows.length) return '<p class="muted">No records found.</p>';
   return `<table><thead><tr><th>Date</th><th>Type</th><th>Unique No.</th><th>Requester</th><th>Amount</th><th>Info</th><th>Status</th>${actions?'<th>Action</th>':''}</tr></thead><tbody>`+
-  rows.map(r=>`<tr><td>${r.date||''}</td><td>${r.recordType||''}</td><td>${r.uniqueNumber||r.recordId||''}</td><td>${r.requestedByName||''}</td><td>${r.amount?money(r.amount):''}</td><td>${escapeHtml(r.purpose||r.revenueDescription||r.sampleType||'')}</td><td><span class="pill">${r.status||''}</span></td>${actions?`<td><textarea id="c_${r.uniqueNumber}" placeholder="Comment"></textarea><button onclick="approve('${r.uniqueNumber}','approve')">Approve</button> <button class="danger" onclick="approve('${r.uniqueNumber}','reject')">Reject</button></td>`:''}</tr>`).join('')+
+  rows.map(r=>`<tr><td>${r.date||''}</td><td>${r.recordType||''}</td><td>${r.uniqueNumber||r.recordId||''}</td><td>${r.requestedByName||''}</td><td>${r.amount?money(r.amount):''}</td><td>${escapeHtml(r.purpose||r.revenueDescription||r.sampleType||'')}</td><td><span class="pill">${r.status||''}</span></td>${actions?`<td><textarea id="c_${r.uniqueNumber}" placeholder="Comment"></textarea><button onclick="approve('${r.uniqueNumber}','approve')">Approve</button> <button class="danger" onclick="approve('${r.uniqueNumber}','reject')">Reject</button>${r.approvalLink?`<br><a class="wa-link" href="${r.approvalLink}" target="_blank">Open System Link</a>`:''}</td>`:''}</tr>`).join('')+
   '</tbody></table>';
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 function showTab(id,btn){ document.querySelectorAll('.tabPanel').forEach(x=>x.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); }
 
 async function saveRevenue(){ try{ await api('saveRevenue',{userId:STATE.user.userId,email:STATE.user.email,date:val('revDate'),amount:num('revAmount'),category:val('revCategory'),description:val('revDescription')}); toast('Revenue saved.'); await refresh(); }catch(e){toast(e.message);} }
-async function requestExpense(){ try{ const r=await api('requestExpense',{userId:STATE.user.userId,email:STATE.user.email,date:val('expDate'),amount:num('expAmount'),category:getExpenseCategory(),purpose:val('expPurpose'),paymentInfo:val('expPaymentInfo')}); toast('Expense request submitted: '+r.uniqueNumber); await refresh(); }catch(e){toast(e.message);} }
-async function approve(unique, decision){ try{ await api('approveExpense',{userId:STATE.user.userId,email:STATE.user.email,uniqueNumber:unique,decision,comment:val('c_'+unique)}); toast('Expense request updated.'); await refresh(); }catch(e){toast(e.message);} }
+async function requestExpense(){ try{ const r=await api('requestExpense',{userId:STATE.user.userId,email:STATE.user.email,date:val('expDate'),amount:num('expAmount'),category:getExpenseCategory(),purpose:val('expPurpose'),paymentInfo:val('expPaymentInfo')}); toast('Expense request submitted: '+r.uniqueNumber); openWhatsAppLinks(r.whatsappLinks); await refresh(); }catch(e){toast(e.message);} }
+async function approve(unique, decision){ try{ const r=await api('approveExpense',{userId:STATE.user.userId,email:STATE.user.email,uniqueNumber:unique,decision,comment:val('c_'+unique)}); toast('Expense request updated.'); openWhatsAppLinks(r.whatsappLinks); await refresh(); }catch(e){toast(e.message);} }
 async function saveSamples(){ try{ const data={userId:STATE.user.userId,email:STATE.user.email,date:val('sampleDate'),sampleType:val('sampleType'),sampleBatch:val('sampleBatch'),tonnageLeached:num('tonnageLeached')}; for(let i=1;i<=10;i++) data['sample'+i]=num('sample'+i); await api('saveSamples',data); toast('Sample results saved.'); await refresh(); }catch(e){toast(e.message);} }
 function toggleExpenseOther(){ document.getElementById('expOtherWrap').classList.toggle('hidden', val('expCategory')!=='Other'); }
 function getExpenseCategory(){ return val('expCategory')==='Other' ? val('expOtherCategory') : val('expCategory'); }
@@ -252,6 +269,11 @@ function rangeForPeriod(period){ const now=new Date(); let from=new Date(now), t
 function generateReport(){ const period=val('reportPeriod'); let from=val('reportFrom'), to=val('reportTo'); if(!from||!to){ [from,to]=rangeForPeriod(period); document.getElementById('reportFrom').value=from; document.getElementById('reportTo').value=to; } const type=val('reportType'); const rows=STATE.records.filter(r=>['Revenue','Expense'].includes(r.recordType)).filter(r=>(type==='all'||r.recordType===type) && r.date>=from && r.date<=to); const rev=rows.filter(r=>r.recordType==='Revenue').reduce((a,b)=>a+Number(b.amount||0),0); const exp=rows.filter(r=>r.recordType==='Expense' && ['Approved','Paid','Posted'].includes(r.status)).reduce((a,b)=>a+Number(b.amount||0),0); const net=rev-exp; document.getElementById('reportOutput').innerHTML=`<h2>LM Commodities Income & Expenditure Report</h2><p><b>Period:</b> ${period.toUpperCase()} &nbsp; <b>From:</b> ${from} &nbsp; <b>To:</b> ${to}</p><div class="grid"><div class="card"><div class="muted">Total Revenue</div><div class="metric">${money(rev)}</div></div><div class="card"><div class="muted">Approved Expenditure</div><div class="metric">${money(exp)}</div></div><div class="card"><div class="muted">Net Position</div><div class="metric">${money(net)}</div></div></div>`+table(rows,false); }
 function downloadReportPdf(){ if(!document.getElementById('reportOutput').innerHTML || document.getElementById('reportOutput').textContent.includes('Choose a period')) generateReport(); const w=window.open('', '_blank'); w.document.write(`<!doctype html><html><head><title>LM Report</title><style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;font-size:12px}th{background:#f0f3f8}.card{border:1px solid #ddd;padding:10px;margin:8px 0}.metric{font-size:20px;font-weight:800}</style></head><body>${document.getElementById('reportOutput').innerHTML}<script>window.onload=function(){window.print();}<\/script></body></html>`); w.document.close(); }
 async function saveTanks(){ try{ await api('saveTanks',{userId:STATE.user.userId,email:STATE.user.email,date:val('tankDate'),tank1:num('tank1'),tank2:num('tank2'),tank3:num('tank3'),tank4:num('tank4')}); toast('Tank runs saved.'); await refresh(); }catch(e){toast(e.message);} }
+
+function updateBullionPreview(){ const total=num('bullionRecovered')*num('pricePerGram'); const el=document.getElementById('bullionValuePreview'); if(el) el.textContent=money(total); }
+['bullionRecovered','pricePerGram'].forEach(id=>document.addEventListener('input',e=>{ if(e.target && e.target.id===id) updateBullionPreview(); }));
+async function saveProduction(){ try{ await api('saveProduction',{userId:STATE.user.userId,email:STATE.user.email,date:val('prodDate'),oreTonnesProduced:num('oreTonnesProduced'),oreAverageGrade:num('oreAverageGrade'),tonnesMilled:num('tonnesMilled'),bullionRecovered:num('bullionRecovered'),pricePerGram:num('pricePerGram')}); toast('Production saved.'); await refresh(); }catch(e){toast(e.message);} }
+function openWhatsAppLinks(links){ (links||[]).filter(Boolean).slice(0,2).forEach((link,i)=>setTimeout(()=>window.open(link,'_blank'),i*350)); }
 
 (async function init(){
   const u = localStorage.getItem('lmUser');
