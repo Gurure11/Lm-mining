@@ -72,6 +72,7 @@
       <button class="active" onclick="showTab('dashboard',this)">Dashboard</button>
       <button onclick="showTab('revenue',this)">Daily Revenue</button>
       <button onclick="showTab('expense',this)">Expense Request</button>
+      <button onclick="showTab('dailyexpense',this)">Daily Expenditure</button>
       <button onclick="showTab('approvals',this)">Approvals <span id="approvalTabBadge" class="approval-badge hidden">0</span></button>
       <button onclick="showTab('samples',this)">Rock/Sand Samples</button>
       <button onclick="showTab('tanks',this)">Tanks Run</button>
@@ -98,11 +99,31 @@
       <section id="expense" class="tabPanel hidden">
         <div class="card">
           <h2>Request Funds for Expense</h2>
-          <div class="row3"><div><label>Date</label><input id="expDate" type="date"></div><div><label>Amount</label><input id="expAmount" inputmode="decimal"></div><div><label>Category</label><select id="expCategory" onchange="toggleExpenseOther()"><option>Diesel</option><option>Mercury</option><option>Electricity</option><option>Salaries</option><option>Wages</option><option>Transport</option><option>Drill bits</option><option>R/D oil</option><option>Cyanide</option><option>Caustic Soda</option><option>Burnt Lime</option><option>Hydrogen peroxide</option><option>Hydrochloric acid</option><option>Nitric acid</option><option>Borax</option><option>Hand gas</option><option>Acetilyn</option><option>Explosives</option><option>Drill steel</option><option>Grease</option><option>Engine Oil</option><option>Other</option></select></div></div>
+          <div class="row3"><div><label>Date</label><input id="expDate" type="date"></div><div><label>Amount</label><input id="expAmount" inputmode="decimal"></div><div><label>Request Approval Number</label><input id="expApprovalNo" placeholder="Approval / request no."></div></div>
+          <div class="row3"><div><label>Category</label><select id="expCategory" onchange="toggleExpenseOther()"><option>Diesel</option><option>Mercury</option><option>Electricity</option><option>Salaries</option><option>Wages</option><option>Transport</option><option>Drill bits</option><option>R/D oil</option><option>Cyanide</option><option>Caustic Soda</option><option>Burnt Lime</option><option>Hydrogen peroxide</option><option>Hydrochloric acid</option><option>Nitric acid</option><option>Borax</option><option>Hand gas</option><option>Acetilyn</option><option>Explosives</option><option>Drill steel</option><option>Grease</option><option>Engine Oil</option><option>Other</option></select></div></div>
           <div id="expOtherWrap" class="hidden"><label>Other Category</label><input id="expOtherCategory" placeholder="Enter expense category"></div>
           <label>Purpose for request of funds</label><textarea id="expPurpose"></textarea>
           <label>Payment request info</label><textarea id="expPaymentInfo" placeholder="Supplier, bank details, invoice reference, notes"></textarea>
           <button onclick="requestExpense()">Submit Expense Request</button>
+        </div>
+      </section>
+
+
+      <section id="dailyexpense" class="tabPanel hidden">
+        <div class="card">
+          <h2>Enter Daily Expenditure</h2>
+          <p class="muted">This posts directly to Daily Expenses on the dashboard and accrues into weekly and monthly expenses.</p>
+          <div class="row3">
+            <div><label>Date</label><input id="dailyExpDate" type="date"></div>
+            <div><label>Amount</label><input id="dailyExpAmount" inputmode="decimal"></div>
+            <div><label>Request Approval Number</label><input id="dailyExpApprovalNo" placeholder="Required approval / request no."></div>
+          </div>
+          <div class="row3">
+            <div><label>Category</label><input id="dailyExpCategory" value="Daily Expenditure"></div>
+            <div><label>Supplier / Payment Info</label><input id="dailyExpPaymentInfo" placeholder="Supplier, invoice, paid by"></div>
+            <div><label>Notes / Purpose</label><input id="dailyExpPurpose" placeholder="What was paid for"></div>
+          </div>
+          <button onclick="saveDailyExpense()">Save Daily Expenditure</button>
         </div>
       </section>
 
@@ -175,11 +196,11 @@
 
   <div id="toast" class="toast"></div>
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw5lZUeBaBshiwA6jcqDp4pVvRn5xODAWWgMMddWPGftwq6CLAgp7-wZs7m8LA1Qd08/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywiSI_qXAvlerF9nOcS15vBhnMqzzCLe2WzbSTQciHQFN0i52dNJqFpw8SSVkun_MR/exec';
 let STATE = { user:null, records:[], summary:{}, currencyMode:'USD', usdZarRate:null, rateUpdated:null, approvalAlertShown:false };
 
 function today(){ return new Date().toISOString().slice(0,10); }
-['revDate','expDate','sampleDate','tankDate','prodDate','reportFrom','reportTo','creditorDate','creditorDueDate'].forEach(id => setTimeout(()=>{ const el=document.getElementById(id); if(el) el.value=today(); },0));
+['revDate','expDate','dailyExpDate','sampleDate','tankDate','prodDate','reportFrom','reportTo','creditorDate','creditorDueDate'].forEach(id => setTimeout(()=>{ const el=document.getElementById(id); if(el) el.value=today(); },0));
 for(let i=1;i<=10;i++){ const d=document.createElement('div'); d.innerHTML=`<label>Sample ${i}</label><input id="sample${i}" inputmode="decimal" placeholder="Grade result ${i}">`; document.addEventListener('DOMContentLoaded',()=>document.getElementById('sampleInputs').appendChild(d)); }
 
 async function api(action, data={}){
@@ -264,13 +285,13 @@ function renderDashboard(){
   const s=STATE.summary, cards=[
     ['Daily Revenue',money(s.dailyRevenue)],['Weekly Revenue',money(s.weeklyRevenue)],['Monthly Revenue',money(s.monthlyRevenue)],
     ['Daily Expenditure',money(s.dailyExpenditure)],['Weekly Expenditure',money(s.weeklyExpenditure)],['Monthly Expenditure',money(s.monthlyExpenditure)],
-    ['Pending Executive1',s.pendingExecutive1||0],['Pending Executive2',s.pendingExecutive2||0],
+    ['Pending Executive1',s.pendingExecutive1||0],['Pending Executive2',s.pendingExecutive2||0],['Total Approval Requests',s.totalApprovalRequests||0],
     ['Total Tanks So Far',s.totalTanks||0],['Total Rock Samples',s.totalRockSamples||0],['Total Sand Samples',s.totalSandSamples||0],
     ['Average Rock Grade',Number(s.averageRockGrade||0).toFixed(3)],['Average Sand Grade',Number(s.averageSandGrade||0).toFixed(3)],
     ['Total Sands Tonnage Leached',Number(s.totalSandsTonnageLeached||0).toFixed(3)],['Average Sample Grade',Number(s.averageSampleGrade||0).toFixed(3)],
     ['Expected Bullion',Number(s.expectedBullion||0).toFixed(3)],
     ['Daily Ore Production',Number(s.dailyOreProduction||0).toFixed(3)],['Weekly Ore Production',Number(s.weeklyOreProduction||0).toFixed(3)],['Monthly Ore Production',Number(s.monthlyOreProduction||0).toFixed(3)],
-    ['Total Ore Production',Number(s.totalOreProduction||0).toFixed(3)],['Total Tonnes Milled',Number(s.totalTonnesMilled||0).toFixed(3)],['Average Ore Grade',Number(s.averageOreGrade||0).toFixed(3)],
+    ['Total Ore Production',Number(s.totalOreProduction||0).toFixed(3)],['Daily Tonnes Milled',Number(s.dailyTonnesMilled||0).toFixed(3)],['Weekly Tonnes Milled',Number(s.weeklyTonnesMilled||0).toFixed(3)],['Monthly Tonnes Milled',Number(s.monthlyTonnesMilled||0).toFixed(3)],['Total Tonnes Milled',Number(s.totalTonnesMilled||0).toFixed(3)],['Average Ore Grade',Number(s.averageOreGrade||0).toFixed(3)],
     ['Bullion Recovered',Number(s.totalBullionRecovered||0).toFixed(3)],['Bullion Total Value',money(s.bullionTotalValue||0)],
     ['Creditors Due 30 Days',money(s.creditorsDue30Amount||0)],['Creditors Due 60 Days',money(s.creditorsDue60Amount||0)]
   ];
@@ -323,22 +344,23 @@ function creditorsTable(rows){
 function renderRecords(){ document.getElementById('recordsTable').innerHTML = table(STATE.records, false); }
 function table(rows, actions){
   if(!rows.length) return '<p class="muted">No records found.</p>';
-  return `<table><thead><tr><th>Date</th><th>Type</th><th>Unique No.</th><th>Requester</th><th>Amount</th><th>Info</th><th>Status</th>${actions?'<th>Action</th>':''}</tr></thead><tbody>`+
-  rows.map(r=>`<tr><td>${r.date||''}</td><td>${r.recordType||''}</td><td>${r.uniqueNumber||r.recordId||''}</td><td>${r.requestedByName||''}</td><td>${r.amount?money(r.amount):''}</td><td>${escapeHtml(r.purpose||r.revenueDescription||r.sampleType||'')}</td><td><span class="pill">${r.status||''}</span></td>${actions?`<td><textarea id="c_${r.uniqueNumber}" placeholder="Comment"></textarea><button onclick="approve('${r.uniqueNumber}','approve')">Approve</button> <button class="danger" onclick="approve('${r.uniqueNumber}','reject')">Reject</button>${r.approvalLink?`<br><a class="wa-link" href="${r.approvalLink}" target="_blank">Open System Link</a>`:''}</td>`:''}</tr>`).join('')+
+  return `<table><thead><tr><th>Date</th><th>Type</th><th>Unique No.</th><th>Approval No.</th><th>Requester</th><th>Amount</th><th>Info</th><th>Status</th>${actions?'<th>Action</th>':''}</tr></thead><tbody>`+
+  rows.map(r=>`<tr><td>${r.date||''}</td><td>${r.recordType||''}</td><td>${r.uniqueNumber||r.recordId||''}</td><td>${r.requestApprovalNumber||''}</td><td>${r.requestedByName||''}</td><td>${r.amount?money(r.amount):''}</td><td>${escapeHtml(r.purpose||r.revenueDescription||r.sampleType||'')}</td><td><span class="pill">${r.status||''}</span></td>${actions?`<td><textarea id="c_${r.uniqueNumber}" placeholder="Comment"></textarea><button onclick="approve('${r.uniqueNumber}','approve')">Approve</button> <button class="danger" onclick="approve('${r.uniqueNumber}','reject')">Reject</button>${r.approvalLink?`<br><a class="wa-link" href="${r.approvalLink}" target="_blank">Open System Link</a>`:''}</td>`:''}</tr>`).join('')+
   '</tbody></table>';
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 function showTab(id,btn){ document.querySelectorAll('.tabPanel').forEach(x=>x.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); }
 
 async function saveRevenue(){ try{ await api('saveRevenue',{userId:STATE.user.userId,email:STATE.user.email,date:val('revDate'),amount:num('revAmount'),category:val('revCategory'),description:val('revDescription')}); toast('Revenue saved.'); await refresh(); }catch(e){toast(e.message);} }
-async function requestExpense(){ try{ const r=await api('requestExpense',{userId:STATE.user.userId,email:STATE.user.email,date:val('expDate'),amount:num('expAmount'),category:getExpenseCategory(),purpose:val('expPurpose'),paymentInfo:val('expPaymentInfo')}); toast('Expense request submitted: '+r.uniqueNumber); openWhatsAppLinks(r.whatsappLinks); await refresh(); }catch(e){toast(e.message);} }
+async function requestExpense(){ try{ const r=await api('requestExpense',{userId:STATE.user.userId,email:STATE.user.email,date:val('expDate'),amount:num('expAmount'),requestApprovalNumber:val('expApprovalNo'),category:getExpenseCategory(),purpose:val('expPurpose'),paymentInfo:val('expPaymentInfo')}); toast('Expense request submitted: '+r.uniqueNumber); openWhatsAppLinks(r.whatsappLinks); await refresh(); }catch(e){toast(e.message);} }
+async function saveDailyExpense(){ try{ await api('saveDailyExpense',{userId:STATE.user.userId,email:STATE.user.email,date:val('dailyExpDate'),amount:num('dailyExpAmount'),requestApprovalNumber:val('dailyExpApprovalNo'),category:val('dailyExpCategory'),purpose:val('dailyExpPurpose'),paymentInfo:val('dailyExpPaymentInfo')}); toast('Daily expenditure saved.'); await refresh(); }catch(e){toast(e.message);} }
 async function approve(unique, decision){ try{ const r=await api('approveExpense',{userId:STATE.user.userId,email:STATE.user.email,uniqueNumber:unique,decision,comment:val('c_'+unique)}); toast('Expense request updated.'); openWhatsAppLinks(r.whatsappLinks); await refresh(); }catch(e){toast(e.message);} }
 async function saveSamples(){ try{ const data={userId:STATE.user.userId,email:STATE.user.email,date:val('sampleDate'),sampleType:val('sampleType'),sampleBatch:val('sampleBatch'),tonnageLeached:num('tonnageLeached')}; for(let i=1;i<=10;i++) data['sample'+i]=num('sample'+i); await api('saveSamples',data); toast('Sample results saved.'); await refresh(); }catch(e){toast(e.message);} }
 function toggleExpenseOther(){ document.getElementById('expOtherWrap').classList.toggle('hidden', val('expCategory')!=='Other'); }
 function getExpenseCategory(){ return val('expCategory')==='Other' ? val('expOtherCategory') : val('expCategory'); }
 async function saveCreditor(){ try{ await api('saveCreditor',{userId:STATE.user.userId,email:STATE.user.email,creditorName:val('creditorName'),invoice:val('creditorInvoice'),amount:num('creditorAmount'),date:val('creditorDate'),dueDate:val('creditorDueDate'),category:val('creditorCategory'),notes:val('creditorNotes')}); toast('Creditor saved.'); await refresh(); }catch(e){toast(e.message);} }
 function rangeForPeriod(period){ const now=new Date(); let from=new Date(now), to=new Date(now); if(period==='weekly'){ const day=from.getDay(); from.setDate(from.getDate()-day+(day===0?-6:1)); } if(period==='monthly'){ from=new Date(now.getFullYear(),now.getMonth(),1); } if(period==='quarterly'){ from=new Date(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1); } if(period==='yearly'){ from=new Date(now.getFullYear(),0,1); } return [from.toISOString().slice(0,10), to.toISOString().slice(0,10)]; }
-function generateReport(){ const period=val('reportPeriod'); let from=val('reportFrom'), to=val('reportTo'); if(!from||!to){ [from,to]=rangeForPeriod(period); document.getElementById('reportFrom').value=from; document.getElementById('reportTo').value=to; } const type=val('reportType'); const rows=STATE.records.filter(r=>['Revenue','Expense'].includes(r.recordType)).filter(r=>(type==='all'||r.recordType===type) && r.date>=from && r.date<=to); const rev=rows.filter(r=>r.recordType==='Revenue').reduce((a,b)=>a+Number(b.amount||0),0); const exp=rows.filter(r=>r.recordType==='Expense' && ['Approved','Paid','Posted'].includes(r.status)).reduce((a,b)=>a+Number(b.amount||0),0); const net=rev-exp; document.getElementById('reportOutput').innerHTML=`<h2>LM Commodities Income & Expenditure Report</h2><p><b>Period:</b> ${period.toUpperCase()} &nbsp; <b>From:</b> ${from} &nbsp; <b>To:</b> ${to}</p><div class="grid"><div class="card"><div class="muted">Total Revenue</div><div class="metric">${money(rev)}</div></div><div class="card"><div class="muted">Approved Expenditure</div><div class="metric">${money(exp)}</div></div><div class="card"><div class="muted">Net Position</div><div class="metric">${money(net)}</div></div></div>`+table(rows,false); }
+function generateReport(){ const period=val('reportPeriod'); let from=val('reportFrom'), to=val('reportTo'); if(!from||!to){ [from,to]=rangeForPeriod(period); document.getElementById('reportFrom').value=from; document.getElementById('reportTo').value=to; } const type=val('reportType'); const rows=STATE.records.filter(r=>['Revenue','Expense','DailyExpense'].includes(r.recordType)).filter(r=>((type==='all')||(type==='Revenue'&&r.recordType==='Revenue')||(type==='Expense'&&['Expense','DailyExpense'].includes(r.recordType))) && r.date>=from && r.date<=to); const prodRows=STATE.records.filter(r=>r.recordType==='Production' && r.date>=from && r.date<=to); const rev=rows.filter(r=>r.recordType==='Revenue').reduce((a,b)=>a+Number(b.amount||0),0); const exp=rows.filter(r=>(r.recordType==='DailyExpense') || (r.recordType==='Expense' && ['Approved','Paid','Posted'].includes(r.status))).reduce((a,b)=>a+Number(b.amount||0),0); const tonnesMilled=prodRows.reduce((a,b)=>a+Number(b.tonnesMilled||0),0); const oreProduced=prodRows.reduce((a,b)=>a+Number(b.oreTonnesProduced||0),0); const net=rev-exp; document.getElementById('reportOutput').innerHTML=`<h2>LM Commodities Income & Expenditure Report</h2><p><b>Period:</b> ${period.toUpperCase()} &nbsp; <b>From:</b> ${from} &nbsp; <b>To:</b> ${to}</p><div class="grid"><div class="card"><div class="muted">Total Revenue</div><div class="metric">${money(rev)}</div></div><div class="card"><div class="muted">Approved/Daily Expenditure</div><div class="metric">${money(exp)}</div></div><div class="card"><div class="muted">Net Position</div><div class="metric">${money(net)}</div></div><div class="card"><div class="muted">Tonnes Milled</div><div class="metric">${Number(tonnesMilled||0).toFixed(3)}</div></div><div class="card"><div class="muted">Ore Produced</div><div class="metric">${Number(oreProduced||0).toFixed(3)}</div></div></div>`+table(rows,false); }
 function downloadReportPdf(){ if(!document.getElementById('reportOutput').innerHTML || document.getElementById('reportOutput').textContent.includes('Choose a period')) generateReport(); const w=window.open('', '_blank'); w.document.write(`<!doctype html><html><head><title>LM Report</title><style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;font-size:12px}th{background:#f0f3f8}.card{border:1px solid #ddd;padding:10px;margin:8px 0}.metric{font-size:20px;font-weight:800}</style></head><body>${document.getElementById('reportOutput').innerHTML}<script>window.onload=function(){window.print();}<\/script></body></html>`); w.document.close(); }
 async function saveTanks(){ try{ await api('saveTanks',{userId:STATE.user.userId,email:STATE.user.email,date:val('tankDate'),tank1:num('tank1'),tank2:num('tank2'),tank3:num('tank3'),tank4:num('tank4')}); toast('Tank runs saved.'); await refresh(); }catch(e){toast(e.message);} }
 
