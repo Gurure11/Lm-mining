@@ -91,6 +91,7 @@
       <button onclick="showTab('revenue',this)">Daily Revenue</button>
       <button onclick="showTab('expense',this)">Expense Request</button>
       <button onclick="showTab('dailyexpense',this)">Daily Expenditure</button>
+      <button onclick="showTab('travelfuel',this)">Travel & Fuel Entry</button>
       <button onclick="showTab('approvals',this)">Approvals <span id="approvalTabBadge" class="approval-badge hidden">0</span></button>
       <button onclick="showTab('samples',this)">Rock/Sand Samples</button>
       <button onclick="showTab('tanks',this)">Tanks Run</button>
@@ -147,6 +148,31 @@
           </div>
           <button onclick="saveDailyExpense()">Save Daily Expenditure</button>
         </div>
+      </section>
+
+      <section id="travelfuel" class="tabPanel hidden">
+        <div class="card">
+          <h2>Travel & Fuel Log Entry</h2>
+          <p class="muted">Entries are saved to the <b>Travel & Fuel Log</b> tab and immediately update the dashboard totals.</p>
+          <div class="row3">
+            <div><label>Date</label><input id="travelDate" type="date"></div>
+            <div><label>Driver</label><input id="travelDriver" placeholder="Driver name"></div>
+            <div><label>Vehicle</label><input id="travelVehicle" placeholder="Vehicle / registration"></div>
+          </div>
+          <div class="row3">
+            <div><label>Odo Start</label><input id="travelOdoStart" inputmode="decimal"></div>
+            <div><label>Odo Finish</label><input id="travelOdoFinish" inputmode="decimal"></div>
+            <div><label>KM Travelled</label><input id="travelKm" inputmode="decimal" placeholder="Calculated automatically"></div>
+          </div>
+          <div class="row3">
+            <div><label>Fuel Used</label><input id="travelFuelUsed" inputmode="decimal" placeholder="Litres"></div>
+            <div><label>Cash Paid for Fuel</label><input id="travelCashPaid" inputmode="decimal"></div>
+            <div><label>Areas Visited</label><input id="travelAreas" placeholder="Areas / route visited"></div>
+          </div>
+          <label>Notes</label><textarea id="travelNotes" placeholder="Additional travel or fuel notes"></textarea>
+          <button onclick="saveTravelFuel()">Save Travel & Fuel Entry</button>
+        </div>
+        <div class="card"><h2>Recent Travel & Fuel Entries</h2><div id="travelFuelTable"></div></div>
       </section>
 
       <section id="approvals" class="tabPanel hidden">
@@ -219,10 +245,10 @@
   <div id="toast" class="toast"></div>
 <script>
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEl1eK6A7dNgRmUVLGNQ-AxUtHrbCE44BSNsDGEjcEDevAL7OWIfW0abrrE-Gm7ZncbQ/exec';
-let STATE = { user:null, records:[], summary:{}, currencyMode:'USD', usdZarRate:null, rateUpdated:null, approvalAlertShown:false };
+let STATE = { user:null, records:[], travelRecords:[], summary:{}, currencyMode:'USD', usdZarRate:null, rateUpdated:null, approvalAlertShown:false };
 
 function today(){ return new Date().toISOString().slice(0,10); }
-['revDate','expDate','dailyExpDate','sampleDate','tankDate','prodDate','reportFrom','reportTo','creditorDate','creditorDueDate'].forEach(id => setTimeout(()=>{ const el=document.getElementById(id); if(el) el.value=today(); },0));
+['revDate','expDate','dailyExpDate','travelDate','sampleDate','tankDate','prodDate','reportFrom','reportTo','creditorDate','creditorDueDate'].forEach(id => setTimeout(()=>{ const el=document.getElementById(id); if(el) el.value=today(); },0));
 for(let i=1;i<=10;i++){ const d=document.createElement('div'); d.innerHTML=`<label>Sample ${i}</label><input id="sample${i}" inputmode="decimal" placeholder="Grade result ${i}">`; document.addEventListener('DOMContentLoaded',()=>document.getElementById('sampleInputs').appendChild(d)); }
 
 async function api(action, data={}){
@@ -299,9 +325,9 @@ async function login(){
 function logout(){ localStorage.removeItem('lmUser'); location.reload(); }
 async function refresh(){
   const r = await api('bootstrap',{userId:STATE.user.userId, email:STATE.user.email});
-  STATE.records = r.records || []; STATE.summary = r.summary || {};
+  STATE.records = r.records || []; STATE.travelRecords = r.travelRecords || []; STATE.summary = r.summary || {};
   document.getElementById('liveStatus').textContent = 'Live connection active • Last sync ' + new Date().toLocaleTimeString();
-  renderDashboard(); renderApprovals(); renderCreditors(); renderRecords();
+  renderDashboard(); renderApprovals(); renderCreditors(); renderRecords(); renderTravelFuel();
 }
 function renderDashboard(){
   const s=STATE.summary || {};
@@ -327,7 +353,7 @@ function renderDashboard(){
       </div></div>
     </div>
 
-    <div class="card dashboard-window">
+    <div class="card dashboard-window" onclick="openTabById('travelfuel')">
       <div class="window-head"><div><h3>2. Travel & Fuel Log</h3><span>Weekly movement and monthly totals</span></div><b>🚙</b></div>
       <div class="window-body"><div class="window-section-title">This Week</div><div class="window-metrics">
         ${metric('Odo Start',Number(s.weeklyOdoStart||0).toLocaleString())}${metric('Odo Finish',Number(s.weeklyOdoFinish||0).toLocaleString())}${metric('Fuel Used',Number(s.weeklyFuelUsed||0).toFixed(2)+' L')}${metric('KM Travelled',Number(s.weeklyKmTravelled||0).toFixed(1)+' km')}
@@ -400,6 +426,33 @@ function creditorsTable(rows){
   return `<table><thead><tr><th>Creditor</th><th>Invoice</th><th>Amount</th><th>Invoice Date</th><th>Due Date</th><th>Days</th><th>Status</th><th>Notes</th></tr></thead><tbody>`+
     rows.map(r=>`<tr><td>${escapeHtml(r.creditorName||'')}</td><td>${escapeHtml(r.creditorInvoice||'')}</td><td>${money(r.amount)}</td><td>${r.date||''}</td><td>${r.dueDate||''}</td><td>${daysUntil(r.dueDate)}</td><td><span class="pill">${r.status||'Open'}</span></td><td>${escapeHtml(r.purpose||'')}</td></tr>`).join('')+'</tbody></table>';
 }
+
+function renderTravelFuel(){
+  const rows=STATE.travelRecords||[];
+  const el=document.getElementById('travelFuelTable');
+  if(!el) return;
+  if(!rows.length){ el.innerHTML='<p class="muted">No Travel & Fuel entries found.</p>'; return; }
+  el.innerHTML=`<table><thead><tr><th>Date</th><th>Driver</th><th>Vehicle</th><th>Odo Start</th><th>Odo Finish</th><th>Fuel Used</th><th>KM Travelled</th><th>Areas Visited</th><th>Cash Paid</th><th>Notes</th></tr></thead><tbody>`+
+    rows.slice(0,50).map(r=>`<tr><td>${escapeHtml(r.date||'')}</td><td>${escapeHtml(r.driver||'')}</td><td>${escapeHtml(r.vehicle||'')}</td><td>${Number(r.odoStart||0).toLocaleString()}</td><td>${Number(r.odoFinish||0).toLocaleString()}</td><td>${Number(r.fuelUsed||0).toFixed(2)} L</td><td>${Number(r.kmTravelled||0).toFixed(1)} km</td><td>${escapeHtml(r.areasVisited||'')}</td><td>${money(r.cashPaidForFuel||0)}</td><td>${escapeHtml(r.notes||'')}</td></tr>`).join('')+'</tbody></table>';
+}
+async function saveTravelFuel(){
+  try{
+    const start=num('travelOdoStart'), finish=num('travelOdoFinish');
+    let km=num('travelKm');
+    if(!km && finish>=start) km=finish-start;
+    await api('saveTravelFuel',{userId:STATE.user.userId,email:STATE.user.email,date:val('travelDate'),driver:val('travelDriver'),vehicle:val('travelVehicle'),odoStart:start,odoFinish:finish,fuelUsed:num('travelFuelUsed'),kmTravelled:km,areasVisited:val('travelAreas'),cashPaidForFuel:num('travelCashPaid'),notes:val('travelNotes')});
+    toast('Travel & Fuel entry saved.');
+    ['travelDriver','travelVehicle','travelOdoStart','travelOdoFinish','travelKm','travelFuelUsed','travelCashPaid','travelAreas','travelNotes'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='';});
+    await refresh();
+  }catch(e){ toast(e.message); }
+}
+function updateTravelKm(){
+  const start=num('travelOdoStart'), finish=num('travelOdoFinish');
+  const el=document.getElementById('travelKm');
+  if(el && finish>=start) el.value=(finish-start).toFixed(1);
+}
+document.addEventListener('input',e=>{ if(e.target && (e.target.id==='travelOdoStart'||e.target.id==='travelOdoFinish')) updateTravelKm(); });
+
 function renderRecords(){ document.getElementById('recordsTable').innerHTML = table(STATE.records, false); }
 function table(rows, actions){
   if(!rows.length) return '<p class="muted">No records found.</p>';
