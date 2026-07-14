@@ -40,6 +40,21 @@
     .dashboard-heading { margin-bottom:14px; padding:14px 16px; background:#fff; border:1px solid var(--line); border-radius:14px; }
     .dashboard-heading h2 { margin:0 0 4px; }
     .period-label { margin-top:5px; color:var(--muted); font-size:12px; font-weight:700; }
+    .dashboard-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+    .dashboard-window { padding:0; overflow:hidden; margin:0; cursor:pointer; transition:transform .18s ease, box-shadow .18s ease; }
+    .dashboard-window:hover { transform:translateY(-2px); box-shadow:0 16px 34px rgba(20,30,50,.12); }
+    .window-head { padding:18px; background:linear-gradient(135deg,#0b2b1c,#1f7a4d); color:#fff; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .window-head h3 { margin:0; font-size:18px; }
+    .window-head span { font-size:12px; color:#d8f7e6; }
+    .window-body { padding:16px; }
+    .window-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+    .window-metric { padding:12px; border:1px solid var(--line); border-radius:12px; background:#f8fafc; min-width:0; }
+    .window-metric .metric { font-size:18px; overflow-wrap:anywhere; }
+    .window-section-title { font-weight:800; margin:2px 0 10px; }
+    .accounts-expense { display:none; }
+    .dashboard-window.show-expense .accounts-revenue { display:none; }
+    .dashboard-window.show-expense .accounts-expense { display:block; }
+    .area-list { margin-top:10px; padding:10px 12px; border-radius:12px; background:#f8fafc; border:1px solid var(--line); line-height:1.5; }
     .row { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
     .row3 { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; }
     table { width:100%; border-collapse:collapse; background:#fff; border-radius:12px; overflow:hidden; }
@@ -52,7 +67,7 @@
     .rate-badge { font-size:12px; color:#c7f9dd; }
     .approval-badge { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; margin-left:6px; padding:0 7px; border-radius:999px; background:var(--bad); color:#fff; font-size:12px; font-weight:800; vertical-align:middle; }
     .approval-alert { border:1px solid #fed7aa; background:#fff7ed; color:#9a3412; border-radius:14px; padding:12px 14px; margin-bottom:14px; font-weight:700; }
-    @media(max-width:900px){ .grid,.grid2,.row,.row3 { grid-template-columns:1fr; } .topbar { align-items:flex-start; gap:10px; flex-direction:column; } }
+    @media(max-width:900px){ .grid,.grid2,.row,.row3,.dashboard-grid,.window-metrics { grid-template-columns:1fr; } .topbar { align-items:flex-start; gap:10px; flex-direction:column; } }
   </style>
 </head>
 <body>
@@ -91,7 +106,7 @@
           <h2>Dashboard Summary</h2>
           <div class="muted" id="dashboardAsAt">Data period loading...</div>
         </div>
-        <div class="grid" id="summaryCards"></div>
+        <div class="dashboard-grid" id="summaryCards"></div>
       </section>
 
       <section id="revenue" class="tabPanel hidden">
@@ -203,7 +218,7 @@
 
   <div id="toast" class="toast"></div>
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzSkfV9mjVqIzNqjVY0hOit5VpoX7ifKF65paguZxV1d-bxq8S_h-B4jU-Cp7kn7HwA/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEl1eK6A7dNgRmUVLGNQ-AxUtHrbCE44BSNsDGEjcEDevAL7OWIfW0abrrE-Gm7ZncbQ/exec';
 let STATE = { user:null, records:[], summary:{}, currencyMode:'USD', usdZarRate:null, rateUpdated:null, approvalAlertShown:false };
 
 function today(){ return new Date().toISOString().slice(0,10); }
@@ -294,25 +309,52 @@ function renderDashboard(){
   const weeklyLabel=s.weeklyLabel||'Current week';
   const monthlyLabel=s.monthlyLabel||'Current month';
   const asAtLabel=s.asAtLabel||s.summaryDateLabel||'Latest Google Sheet data';
-  const totalLabel=s.totalLabel||('All records as at '+asAtLabel);
-  const currentLabel='Current as at '+asAtLabel;
   const heading=document.getElementById('dashboardAsAt');
   if(heading) heading.textContent='Data reflected as at '+asAtLabel+' • Week: '+weeklyLabel+' • Month: '+monthlyLabel;
 
-  const cards=[
-    ['Daily Revenue',money(s.dailyRevenue),dailyLabel],['Weekly Revenue',money(s.weeklyRevenue),weeklyLabel],['Monthly Revenue',money(s.monthlyRevenue),monthlyLabel],
-    ['Daily Expenditure',money(s.dailyExpenditure),dailyLabel],['Weekly Expenditure',money(s.weeklyExpenditure),weeklyLabel],['Monthly Expenditure',money(s.monthlyExpenditure),monthlyLabel],
-    ['Pending Executive1',s.pendingExecutive1||0,currentLabel],['Pending Executive2',s.pendingExecutive2||0,currentLabel],['Total Approval Requests',s.totalApprovalRequests||0,currentLabel],
-    ['Total Tanks So Far',s.totalTanks||0,totalLabel],['Total Rock Samples',s.totalRockSamples||0,totalLabel],['Total Sand Samples',s.totalSandSamples||0,totalLabel],
-    ['Average Rock Grade',Number(s.averageRockGrade||0).toFixed(3),totalLabel],['Average Sand Grade',Number(s.averageSandGrade||0).toFixed(3),totalLabel],
-    ['Total Sands Tonnage Leached',Number(s.totalSandsTonnageLeached||0).toFixed(3),totalLabel],['Average Sample Grade',Number(s.averageSampleGrade||0).toFixed(3),totalLabel],
-    ['Expected Bullion',Number(s.expectedBullion||0).toFixed(3),totalLabel],
-    ['Daily Ore Production',Number(s.dailyOreProduction||0).toFixed(3),dailyLabel],['Weekly Ore Production',Number(s.weeklyOreProduction||0).toFixed(3),weeklyLabel],['Monthly Ore Production',Number(s.monthlyOreProduction||0).toFixed(3),monthlyLabel],
-    ['Total Ore Production',Number(s.totalOreProduction||0).toFixed(3),totalLabel],['Daily Tonnes Milled',Number(s.dailyTonnesMilled||0).toFixed(3),dailyLabel],['Weekly Tonnes Milled',Number(s.weeklyTonnesMilled||0).toFixed(3),weeklyLabel],['Monthly Tonnes Milled',Number(s.monthlyTonnesMilled||0).toFixed(3),monthlyLabel],['Total Tonnes Milled',Number(s.totalTonnesMilled||0).toFixed(3),totalLabel],['Average Ore Grade',Number(s.averageOreGrade||0).toFixed(3),totalLabel],
-    ['Bullion Recovered',Number(s.totalBullionRecovered||0).toFixed(3),totalLabel],['Bullion Total Value',money(s.bullionTotalValue||0),totalLabel],
-    ['Creditors Due 30 Days',money(s.creditorsDue30Amount||0),'Due within 30 days from '+asAtLabel],['Creditors Due 60 Days',money(s.creditorsDue60Amount||0),'Due 31–60 days from '+asAtLabel]
-  ];
-  document.getElementById('summaryCards').innerHTML = cards.map(c=>`<div class="card"><div class="muted">${c[0]}</div><div class="period-label">${c[2]}</div><div class="metric">${c[1]}</div></div>`).join('');
+  const metric=(label,value,period='')=>`<div class="window-metric"><div class="muted">${label}</div>${period?`<div class="period-label">${period}</div>`:''}<div class="metric">${value}</div></div>`;
+  const areas=(s.monthlyAreasVisited&&s.monthlyAreasVisited.length)?s.monthlyAreasVisited.join(', '):'No areas recorded this month';
+  const approvals=Number(s.totalApprovalRequests||0);
+
+  document.getElementById('summaryCards').innerHTML = `
+    <div class="card dashboard-window" id="accountsWindow" onclick="toggleAccountsWindow(this)">
+      <div class="window-head"><div><h3>1. Accounts</h3><span>Click to switch Revenue / Expenditure</span></div><b>↔</b></div>
+      <div class="window-body accounts-revenue"><div class="window-section-title">Revenue</div><div class="window-metrics">
+        ${metric('Daily Revenue',money(s.dailyRevenue),dailyLabel)}${metric('Weekly Revenue',money(s.weeklyRevenue),weeklyLabel)}${metric('Monthly Revenue',money(s.monthlyRevenue),monthlyLabel)}
+      </div></div>
+      <div class="window-body accounts-expense"><div class="window-section-title">Expenditure</div><div class="window-metrics">
+        ${metric('Daily Expenditure',money(s.dailyExpenditure),dailyLabel)}${metric('Weekly Expenditure',money(s.weeklyExpenditure),weeklyLabel)}${metric('Monthly Expenditure',money(s.monthlyExpenditure),monthlyLabel)}
+      </div></div>
+    </div>
+
+    <div class="card dashboard-window">
+      <div class="window-head"><div><h3>2. Travel & Fuel Log</h3><span>Weekly movement and monthly totals</span></div><b>🚙</b></div>
+      <div class="window-body"><div class="window-section-title">This Week</div><div class="window-metrics">
+        ${metric('Odo Start',Number(s.weeklyOdoStart||0).toLocaleString())}${metric('Odo Finish',Number(s.weeklyOdoFinish||0).toLocaleString())}${metric('Fuel Used',Number(s.weeklyFuelUsed||0).toFixed(2)+' L')}${metric('KM Travelled',Number(s.weeklyKmTravelled||0).toFixed(1)+' km')}
+      </div><div class="area-list"><b>Areas Visited:</b> ${escapeHtml((s.weeklyAreasVisited||[]).join(', ')||'No areas recorded this week')}</div>
+      <div class="window-section-title" style="margin-top:14px">This Month</div><div class="window-metrics">
+        ${metric('Total KM',Number(s.monthlyKmTravelled||0).toFixed(1)+' km')}${metric('Total Fuel',Number(s.monthlyFuelUsed||0).toFixed(2)+' L')}${metric('Cash Paid for Fuel',money(s.monthlyFuelCashPaid||0))}
+      </div><div class="area-list"><b>Monthly Areas:</b> ${escapeHtml(areas)}</div></div>
+    </div>
+
+    <div class="card dashboard-window">
+      <div class="window-head"><div><h3>3. Mining Operations</h3><span>Samples, grades, ore, milling and bullion</span></div><b>⛏</b></div>
+      <div class="window-body"><div class="window-metrics">
+        ${metric('Rock Samples',s.totalRockSamples||0)}${metric('Sand Samples',s.totalSandSamples||0)}${metric('Average Rock Grade',Number(s.averageRockGrade||0).toFixed(3))}${metric('Average Sand Grade',Number(s.averageSandGrade||0).toFixed(3))}${metric('Ore Produced Today',Number(s.dailyOreProduction||0).toFixed(3))}${metric('Tonnes Milled Today',Number(s.dailyTonnesMilled||0).toFixed(3))}${metric('Bullion Recovered',Number(s.totalBullionRecovered||0).toFixed(3))}${metric('Bullion Value',money(s.bullionTotalValue||0))}${metric('Tanks Run',s.totalTanks||0)}
+      </div></div>
+    </div>
+
+    <div class="card dashboard-window" onclick="openTabById('approvals')">
+      <div class="window-head"><div><h3>4. Pending Approvals</h3><span>Click to open the Approval Basket</span></div><b>✓</b></div>
+      <div class="window-body"><div class="window-metrics">
+        ${metric('Executive1',s.pendingExecutive1||0)}${metric('Executive2',s.pendingExecutive2||0)}${metric('Total Pending',approvals)}
+      </div>${approvals?`<div class="approval-alert" style="margin-top:12px;margin-bottom:0">${approvals} approval request${approvals===1?' is':'s are'} awaiting action.</div>`:`<div class="area-list">No pending approvals.</div>`}</div>
+    </div>`;
+}
+function toggleAccountsWindow(el){ el.classList.toggle('show-expense'); }
+function openTabById(id){
+  const btn=[...document.querySelectorAll('.tabs button')].find(b=>String(b.getAttribute('onclick')||'').includes(`'${id}'`));
+  if(btn) showTab(id,btn);
 }
 function renderApprovals(){
   const role=(STATE.user.role||'').toLowerCase(); const basket = role==='executive1'?'Executive1':role==='executive2'?'Executive2':'';
