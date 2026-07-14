@@ -244,7 +244,7 @@
 
   <div id="toast" class="toast"></div>
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtFKYUhSbkDGOcCCbSxK09vs-WPEZEv5ffkRit59J8wNsH66piir2_qAojZPy7KQEK/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzVwHc1dnUYPSB7bbjyWS14JDgNqcEZ1Mm8btaI1mCV0CdTKIUYU8TOY1s0aTkiXWa0/exec';
 let STATE = { user:null, records:[], travelRecords:[], summary:{}, currencyMode:'USD', usdZarRate:null, rateUpdated:null, approvalAlertShown:false };
 
 function today(){ return new Date().toISOString().slice(0,10); }
@@ -253,11 +253,31 @@ for(let i=1;i<=10;i++){ const d=document.createElement('div'); d.innerHTML=`<lab
 
 async function api(action, data={}){
   setSync(true);
+  const payload={action, ...data};
   try{
-    if(!SCRIPT_URL || SCRIPT_URL.includes('PASTE_DEPLOYED')) throw new Error('Paste your deployed Apps Script Web App URL into SCRIPT_URL in the HTML.');
-    const res = await fetch(SCRIPT_URL, { method:'POST', mode:'cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action, ...data}) });
+    // When this HTML is served by Apps Script, call the CURRENT script code
+    // directly. This avoids an old deployment URL returning "Unknown action".
+    if(window.google && google.script && google.script.run){
+      const json=await new Promise((resolve,reject)=>{
+        let runner=google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(err=>reject(new Error(err && err.message ? err.message : String(err))));
+
+        // Travel & Fuel uses dedicated public Apps Script endpoints so it
+        // cannot fail through the generic router as an unknown action.
+        if(action === 'saveTravelFuel') runner.saveTravelFuelEntry(data);
+        else if(action === 'getTravelFuel') runner.fetchTravelFuelEntries(data);
+        else runner.apiRequest(payload);
+      });
+      if(!json || !json.ok) throw new Error((json && json.error) || 'Request failed');
+      return json;
+    }
+
+    // Fallback for opening the HTML outside Apps Script.
+    if(!SCRIPT_URL || SCRIPT_URL.includes('PASTE_DEPLOYED')) throw new Error('The Apps Script Web App URL is not configured.');
+    const res = await fetch(SCRIPT_URL, { method:'POST', mode:'cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload) });
     const text = await res.text();
-    let json; try { json = JSON.parse(text); } catch(e){ throw new Error('Apps Script returned non-JSON. Deploy as Web App, Execute as Me, Anyone with link. Response: '+text.slice(0,160)); }
+    let json; try { json = JSON.parse(text); } catch(e){ throw new Error('Apps Script returned non-JSON: '+text.slice(0,160)); }
     if(!json.ok) throw new Error(json.error || 'Request failed');
     return json;
   } finally { setSync(false); }
