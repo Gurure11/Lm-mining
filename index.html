@@ -244,7 +244,7 @@
 
   <div id="toast" class="toast"></div>
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzVwHc1dnUYPSB7bbjyWS14JDgNqcEZ1Mm8btaI1mCV0CdTKIUYU8TOY1s0aTkiXWa0/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwHClhf2lSSUHq7ZL2eXczPlFON48yqelZF6KtWS1hbrZVGk4xReAhlCnNJjx2xDsEOBA/exec';
 let STATE = { user:null, records:[], travelRecords:[], summary:{}, currencyMode:'USD', usdZarRate:null, rateUpdated:null, approvalAlertShown:false };
 
 function today(){ return new Date().toISOString().slice(0,10); }
@@ -402,11 +402,17 @@ function openTabById(id){
   const btn=[...document.querySelectorAll('.tabs button')].find(b=>String(b.getAttribute('onclick')||'').includes(`'${id}'`));
   if(btn) showTab(id,btn);
 }
+function approvalBasketForCurrentUser(){
+  const name=(STATE.user&&STATE.user.name||'').trim().toLowerCase();
+  if(name==='brighton mhande') return 'Executive1';
+  if(name==='lameck chindove') return 'Executive2';
+  return '';
+}
 function renderApprovals(){
-  const role=(STATE.user.role||'').toLowerCase(); const basket = role==='executive1'?'Executive1':role==='executive2'?'Executive2':'';
+  const basket = approvalBasketForCurrentUser();
   const rows = basket ? STATE.records.filter(r=>r.recordType==='Expense' && r.currentBasket===basket) : [];
   updateApprovalCount(rows.length);
-  if(!basket){ document.getElementById('approvalTable').innerHTML='<p class="muted">Only Executive1 and Executive2 can approve expense requests.</p>'; return; }
+  if(!basket){ document.getElementById('approvalTable').innerHTML='<p class="muted">Only Brighton Mhande and Lameck Chindove can approve expense requests.</p>'; return; }
   document.getElementById('approvalTable').innerHTML = table(rows, true);
 }
 function updateApprovalCount(count){
@@ -420,8 +426,7 @@ function updateApprovalCount(count){
   }
 }
 function currentApprovalRows(){
-  const role=(STATE.user&&STATE.user.role||'').toLowerCase();
-  const basket = role==='executive1'?'Executive1':role==='executive2'?'Executive2':'';
+  const basket = approvalBasketForCurrentUser();
   return basket ? STATE.records.filter(r=>r.recordType==='Expense' && r.currentBasket===basket) : [];
 }
 function showApprovalLoginAlert(){
