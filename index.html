@@ -253,8 +253,8 @@
 
   <div id="toast" class="toast"></div>
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbx1PB1wRZBrgaNsMzwzH-rBoLyy_WAbTBtZhqkprXK8n36NkcYJylBe5pIvB41eo7/exec';
-let STATE = { user:null, records:[], travelRecords:[], journalRecords:[], journalSummary:{}, summary:{}, currencyMode:'USD', usdZarRate:null, rateUpdated:null, approvalAlertShown:false };
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAeFAcTAIXZCRU-P6ltWvx3BByDTT9DEap1n0waZLrKJmMKQ3GaXQgIKWnwss3x-HJ/exec';
+let STATE = { user:null, records:[], travelRecords:[], journalRecords:[], journalSummary:{}, journalUrl:'', summary:{}, currencyMode:'USD', usdZarRate:null, rateUpdated:null, approvalAlertShown:false };
 
 function today(){ return new Date().toISOString().slice(0,10); }
 ['revDate','expDate','dailyExpDate','travelDate','sampleDate','tankDate','prodDate','reportFrom','reportTo','creditorDate','creditorDueDate'].forEach(id => setTimeout(()=>{ const el=document.getElementById(id); if(el) el.value=today(); },0));
@@ -359,7 +359,7 @@ async function refresh(){
     api('getLmJournal',{})
   ]);
   STATE.records = r.records || []; STATE.travelRecords = r.travelRecords || []; STATE.summary = r.summary || {};
-  STATE.journalRecords = j.transactions || []; STATE.journalSummary = j.summary || {};
+  STATE.journalRecords = j.transactions || []; STATE.journalSummary = j.summary || {}; STATE.journalUrl = j.spreadsheetUrl || '';
   document.getElementById('liveStatus').textContent = 'Live connection active • Last sync ' + new Date().toLocaleTimeString();
   renderDashboard(); renderApprovals(); renderCreditors(); renderRecords(); renderTravelFuel();
 }
@@ -424,7 +424,7 @@ function renderJournalWindow(){
     <td class="balance-cell">${money(r.runningBalance||0)}</td>
   </tr>`).join('') : '<tr><td colspan="5" class="muted">No transactions found in LM-Journal.</td></tr>';
   return `<div class="card dashboard-window journal-window">
-    <div class="window-head"><div><h3>5. Daily Transaction View</h3><span>Every transaction from LM-Journal with running balance</span></div><b>💵</b></div>
+    <div class="window-head"><div><h3>5. Daily Cash on Hand</h3><span>Daily transaction journal from LM-Journal</span></div><a href="${escapeHtml(STATE.journalUrl||'https://docs.google.com/spreadsheets/d/1fZIDf9LdOpbvBks_WgDUmH_6YDL4SdCnZ0xCScSjGPM/edit')}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#fff;font-weight:800;text-decoration:underline">View Journal ↗</a></div>
     <div class="window-body">
       <div class="journal-summary">
         <div class="window-metric"><div class="muted">Total Cash In</div><div class="metric">${money(j.totalCashIn||0)}</div></div>
