@@ -253,7 +253,7 @@
 
   <div id="toast" class="toast"></div>
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAeFAcTAIXZCRU-P6ltWvx3BByDTT9DEap1n0waZLrKJmMKQ3GaXQgIKWnwss3x-HJ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxDaBM0QfZ6T-kmkdELW96w_a9ki3pxnzQgtTRheB6Q58mPL4MkEvYFCFH2HsezIA0e/exec';
 let STATE = { user:null, records:[], travelRecords:[], journalRecords:[], journalSummary:{}, journalUrl:'', summary:{}, currencyMode:'USD', usdZarRate:null, rateUpdated:null, approvalAlertShown:false };
 
 function today(){ return new Date().toISOString().slice(0,10); }
@@ -377,15 +377,7 @@ function renderDashboard(){
   const approvals=Number(s.totalApprovalRequests||0);
 
   document.getElementById('summaryCards').innerHTML = `
-    <div class="card dashboard-window" id="accountsWindow" onclick="toggleAccountsWindow(this)">
-      <div class="window-head"><div><h3>1. Accounts</h3><span>Click to switch Revenue / Expenditure</span></div><b>↔</b></div>
-      <div class="window-body accounts-revenue"><div class="window-section-title">Revenue</div><div class="window-metrics">
-        ${metric('Daily Revenue',money(s.dailyRevenue),dailyLabel)}${metric('Weekly Revenue',money(s.weeklyRevenue),weeklyLabel)}${metric('Monthly Revenue',money(s.monthlyRevenue),monthlyLabel)}
-      </div></div>
-      <div class="window-body accounts-expense"><div class="window-section-title">Expenditure</div><div class="window-metrics">
-        ${metric('Daily Expenditure',money(s.dailyExpenditure),dailyLabel)}${metric('Weekly Expenditure',money(s.weeklyExpenditure),weeklyLabel)}${metric('Monthly Expenditure',money(s.monthlyExpenditure),monthlyLabel)}
-      </div></div>
-    </div>
+    ${renderJournalWindow()}
 
     <div class="card dashboard-window" onclick="openTabById('travelfuel')">
       <div class="window-head"><div><h3>2. Travel & Fuel Log</h3><span>Weekly movement and monthly totals</span></div><b>🚙</b></div>
@@ -410,8 +402,7 @@ function renderDashboard(){
         ${metric('Executive1',s.pendingExecutive1||0)}${metric('Executive2',s.pendingExecutive2||0)}${metric('Total Pending',approvals)}
       </div>${approvals?`<div class="approval-alert" style="margin-top:12px;margin-bottom:0">${approvals} approval request${approvals===1?' is':'s are'} awaiting action.</div>`:`<div class="area-list">No pending approvals.</div>`}</div>
     </div>
-
-    ${renderJournalWindow()}`;
+`;
 }
 function renderJournalWindow(){
   const rows = STATE.journalRecords || [];
@@ -424,7 +415,7 @@ function renderJournalWindow(){
     <td class="balance-cell">${money(r.runningBalance||0)}</td>
   </tr>`).join('') : '<tr><td colspan="5" class="muted">No transactions found in LM-Journal.</td></tr>';
   return `<div class="card dashboard-window journal-window">
-    <div class="window-head"><div><h3>5. Daily Cash on Hand</h3><span>Daily transaction journal from LM-Journal</span></div><a href="${escapeHtml(STATE.journalUrl||'https://docs.google.com/spreadsheets/d/1fZIDf9LdOpbvBks_WgDUmH_6YDL4SdCnZ0xCScSjGPM/edit')}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#fff;font-weight:800;text-decoration:underline">View Journal ↗</a></div>
+    <div class="window-head"><div><h3>1. Daily Transaction Journal</h3><span>Oldest transactions appear first</span></div><b>▤</b></div>
     <div class="window-body">
       <div class="journal-summary">
         <div class="window-metric"><div class="muted">Total Cash In</div><div class="metric">${money(j.totalCashIn||0)}</div></div>
@@ -435,7 +426,6 @@ function renderJournalWindow(){
     </div>
   </div>`;
 }
-function toggleAccountsWindow(el){ el.classList.toggle('show-expense'); }
 function openTabById(id){
   const btn=[...document.querySelectorAll('.tabs button')].find(b=>String(b.getAttribute('onclick')||'').includes(`'${id}'`));
   if(btn) showTab(id,btn);
