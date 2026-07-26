@@ -67,7 +67,16 @@
     .rate-badge { font-size:12px; color:#c7f9dd; }
     .approval-badge { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; margin-left:6px; padding:0 7px; border-radius:999px; background:var(--bad); color:#fff; font-size:12px; font-weight:800; vertical-align:middle; }
     .approval-alert { border:1px solid #fed7aa; background:#fff7ed; color:#9a3412; border-radius:14px; padding:12px 14px; margin-bottom:14px; font-weight:700; }
-    @media(max-width:900px){ .grid,.grid2,.row,.row3,.dashboard-grid,.window-metrics { grid-template-columns:1fr; } .topbar { align-items:flex-start; gap:10px; flex-direction:column; } }
+    .journal-window { grid-column:1 / -1; cursor:default; }
+    .journal-window:hover { transform:none; }
+    .journal-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+    .journal-table-wrap { max-height:440px; overflow:auto; border:1px solid var(--line); border-radius:12px; }
+    .journal-table-wrap table { border-radius:0; }
+    .journal-table-wrap thead th { position:sticky; top:0; z-index:1; }
+    .amount-in { color:var(--brand); font-weight:800; }
+    .amount-out { color:var(--bad); font-weight:800; }
+    .balance-cell { font-weight:800; }
+    @media(max-width:900px){ .grid,.grid2,.row,.row3,.dashboard-grid,.window-metrics,.journal-summary { grid-template-columns:1fr; } .topbar { align-items:flex-start; gap:10px; flex-direction:column; } }
   </style>
 </head>
 <body>
@@ -244,8 +253,8 @@
 
   <div id="toast" class="toast"></div>
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwHClhf2lSSUHq7ZL2eXczPlFON48yqelZF6KtWS1hbrZVGk4xReAhlCnNJjx2xDsEOBA/exec';
-let STATE = { user:null, records:[], travelRecords:[], summary:{}, currencyMode:'USD', usdZarRate:null, rateUpdated:null, approvalAlertShown:false };
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbx1PB1wRZBrgaNsMzwzH-rBoLyy_WAbTBtZhqkprXK8n36NkcYJylBe5pIvB41eo7/exec';
+let STATE = { user:null, records:[], travelRecords:[], journalRecords:[], journalSummary:{}, summary:{}, currencyMode:'USD', usdZarRate:null, rateUpdated:null, approvalAlertShown:false };
 
 function today(){ return new Date().toISOString().slice(0,10); }
 ['revDate','expDate','dailyExpDate','travelDate','sampleDate','tankDate','prodDate','reportFrom','reportTo','creditorDate','creditorDueDate'].forEach(id => setTimeout(()=>{ const el=document.getElementById(id); if(el) el.value=today(); },0));
@@ -267,6 +276,7 @@ async function api(action, data={}){
         // cannot fail through the generic router as an unknown action.
         if(action === 'saveTravelFuel') runner.saveTravelFuelEntry(data);
         else if(action === 'getTravelFuel') runner.fetchTravelFuelEntries(data);
+        else if(action === 'getLmJournal') runner.fetchLmJournalEntries(data);
         else runner.apiRequest(payload);
       });
       if(!json || !json.ok) throw new Error((json && json.error) || 'Request failed');
@@ -344,8 +354,12 @@ async function login(){
 }
 function logout(){ localStorage.removeItem('lmUser'); location.reload(); }
 async function refresh(){
-  const r = await api('bootstrap',{userId:STATE.user.userId, email:STATE.user.email});
+  const [r,j] = await Promise.all([
+    api('bootstrap',{userId:STATE.user.userId, email:STATE.user.email}),
+    api('getLmJournal',{})
+  ]);
   STATE.records = r.records || []; STATE.travelRecords = r.travelRecords || []; STATE.summary = r.summary || {};
+  STATE.journalRecords = j.transactions || []; STATE.journalSummary = j.summary || {};
   document.getElementById('liveStatus').textContent = 'Live connection active • Last sync ' + new Date().toLocaleTimeString();
   renderDashboard(); renderApprovals(); renderCreditors(); renderRecords(); renderTravelFuel();
 }
@@ -395,7 +409,31 @@ function renderDashboard(){
       <div class="window-body"><div class="window-metrics">
         ${metric('Executive1',s.pendingExecutive1||0)}${metric('Executive2',s.pendingExecutive2||0)}${metric('Total Pending',approvals)}
       </div>${approvals?`<div class="approval-alert" style="margin-top:12px;margin-bottom:0">${approvals} approval request${approvals===1?' is':'s are'} awaiting action.</div>`:`<div class="area-list">No pending approvals.</div>`}</div>
-    </div>`;
+    </div>
+
+    ${renderJournalWindow()}`;
+}
+function renderJournalWindow(){
+  const rows = STATE.journalRecords || [];
+  const j = STATE.journalSummary || {};
+  const body = rows.length ? rows.map(r=>`<tr>
+    <td>${escapeHtml(r.date||'')}</td>
+    <td>${escapeHtml(r.details||'')}</td>
+    <td class="amount-in">${Number(r.cashIn||0) ? money(r.cashIn) : ''}</td>
+    <td class="amount-out">${Number(r.payment||0) ? money(r.payment) : ''}</td>
+    <td class="balance-cell">${money(r.runningBalance||0)}</td>
+  </tr>`).join('') : '<tr><td colspan="5" class="muted">No transactions found in LM-Journal.</td></tr>';
+  return `<div class="card dashboard-window journal-window">
+    <div class="window-head"><div><h3>5. Daily Transaction View</h3><span>Every transaction from LM-Journal with running balance</span></div><b>💵</b></div>
+    <div class="window-body">
+      <div class="journal-summary">
+        <div class="window-metric"><div class="muted">Total Cash In</div><div class="metric">${money(j.totalCashIn||0)}</div></div>
+        <div class="window-metric"><div class="muted">Total Payments</div><div class="metric">${money(j.totalPayments||0)}</div></div>
+        <div class="window-metric"><div class="muted">Cash on Hand</div><div class="metric">${money(j.cashOnHand||0)}</div></div>
+      </div>
+      <div class="journal-table-wrap"><table><thead><tr><th>Date</th><th>Details</th><th>Cash In</th><th>Payment</th><th>Running Balance</th></tr></thead><tbody>${body}</tbody></table></div>
+    </div>
+  </div>`;
 }
 function toggleAccountsWindow(el){ el.classList.toggle('show-expense'); }
 function openTabById(id){
